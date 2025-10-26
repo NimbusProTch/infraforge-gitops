@@ -2,7 +2,7 @@
 # GitOps Configuration for Deployment
 #
 # This file is updated by CI/CD pipeline when new image is pushed
-# App Code Repo: github.com/gaskin/smk
+# App Code Repo: github.com/NimbusProTch/smk
 
 nameOverride: "smk"
 fullnameOverride: "smk"

@@ -81,7 +81,14 @@ variable "mq_username" {
 variable "git_repo_url" {
   description = "Git repository URL for ArgoCD"
   type        = string
-  default     = "https://github.com/gaskin/infraforge-gitops.git"
+  default     = "https://github.com/NimbusProTch/infraforge-gitops.git"
+}
+
+variable "github_token" {
+  description = "GitHub Personal Access Token for ArgoCD private repository access"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
 
 variable "default_tags" {

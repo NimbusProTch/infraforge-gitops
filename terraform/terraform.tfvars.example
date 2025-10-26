@@ -25,7 +25,7 @@ db_username = "dbadmin"
 db_password = "CHANGE_ME_STRONG_PASSWORD"  # CHANGE THIS!
 
 # Git Repository
-git_repo_url = "https://github.com/gaskin/infraforge-gitops.git"
+git_repo_url = "https://github.com/NimbusProTch/infraforge-gitops.git"
 
 # Tags
 default_tags = {

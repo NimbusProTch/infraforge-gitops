@@ -82,7 +82,7 @@ aws route53 list-hosted-zones-by-name --dns-name ticarethanem.net
 
 ```bash
 # Clone repository
-git clone https://github.com/gaskin/infraforge-gitops.git
+git clone https://github.com/NimbusProTch/infraforge-gitops.git
 cd infraforge-gitops
 
 # Run setup script
@@ -112,7 +112,7 @@ Update these values:
 db_password = "YOUR_STRONG_PASSWORD_HERE"  # Change this!
 
 # Git repository URL (if different)
-git_repo_url = "https://github.com/gaskin/infraforge-gitops.git"
+git_repo_url = "https://github.com/NimbusProTch/infraforge-gitops.git"
 
 # Optional: Adjust node configuration
 node_desired_size = 2

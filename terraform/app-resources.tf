@@ -26,11 +26,11 @@ resource "kubernetes_namespace" "apps" {
 }
 
 # ============================================================================
-# Database Secrets for Enabled Apps
+# Database Secrets for Apps with MySQL
 # ============================================================================
 
-resource "kubernetes_secret" "db_credentials" {
-  for_each = local.enabled_apps
+resource "kubernetes_secret" "mysql_db_credentials" {
+  for_each = local.need_mysql ? local.mysql_apps : {}
 
   metadata {
     name      = "db-credentials"
@@ -43,17 +43,43 @@ resource "kubernetes_secret" "db_credentials" {
   }
 
   data = {
-    DATABASE_URL = each.value.database.type == "mysql" ? (
-      "mysql://${var.db_username}:${random_password.db_master.result}@${aws_db_instance.mysql[0].address}:${aws_db_instance.mysql[0].port}/${try(each.value.database.name, "${each.key}_db")}"
-      ) : (
-      "postgresql://${var.db_username}:${random_password.db_master.result}@${aws_db_instance.postgresql[0].address}:${aws_db_instance.postgresql[0].port}/${try(each.value.database.name, "${each.key}_db")}"
-    )
-    DB_HOST     = each.value.database.type == "mysql" ? aws_db_instance.mysql[0].address : aws_db_instance.postgresql[0].address
-    DB_PORT     = each.value.database.type == "mysql" ? tostring(aws_db_instance.mysql[0].port) : tostring(aws_db_instance.postgresql[0].port)
-    DB_NAME     = try(each.value.database.name, "${each.key}_db")
-    DB_USERNAME = var.db_username
-    DB_PASSWORD = random_password.db_master.result
-    DB_TYPE     = each.value.database.type
+    DATABASE_URL = "mysql://${var.db_username}:${random_password.db_master.result}@${aws_db_instance.mysql[0].address}:${aws_db_instance.mysql[0].port}/${try(each.value.database.name, "${each.key}_db")}"
+    DB_HOST      = aws_db_instance.mysql[0].address
+    DB_PORT      = tostring(aws_db_instance.mysql[0].port)
+    DB_NAME      = try(each.value.database.name, "${each.key}_db")
+    DB_USERNAME  = var.db_username
+    DB_PASSWORD  = random_password.db_master.result
+    DB_TYPE      = "mysql"
+  }
+
+  type = "Opaque"
+}
+
+# ============================================================================
+# Database Secrets for Apps with PostgreSQL
+# ============================================================================
+
+resource "kubernetes_secret" "postgresql_db_credentials" {
+  for_each = local.need_postgresql ? local.postgresql_apps : {}
+
+  metadata {
+    name      = "db-credentials"
+    namespace = kubernetes_namespace.apps[each.key].metadata[0].name
+
+    labels = {
+      "app.kubernetes.io/name"       = each.key
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+
+  data = {
+    DATABASE_URL = "postgresql://${var.db_username}:${random_password.db_master.result}@${aws_db_instance.postgresql[0].address}:${aws_db_instance.postgresql[0].port}/${try(each.value.database.name, "${each.key}_db")}"
+    DB_HOST      = aws_db_instance.postgresql[0].address
+    DB_PORT      = tostring(aws_db_instance.postgresql[0].port)
+    DB_NAME      = try(each.value.database.name, "${each.key}_db")
+    DB_USERNAME  = var.db_username
+    DB_PASSWORD  = random_password.db_master.result
+    DB_TYPE      = "postgresql"
   }
 
   type = "Opaque"

@@ -11,6 +11,6 @@ keywords:
   - kubernetes
   - microservices
   - gitops
-home: https://github.com/gaskin/infraforge-gitops
+home: https://github.com/NimbusProTch/infraforge-gitops
 sources:
-  - https://github.com/gaskin/infraforge-gitops
+  - https://github.com/NimbusProTch/infraforge-gitops

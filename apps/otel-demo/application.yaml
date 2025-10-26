@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-demo
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    # OpenTelemetry Demo Helm Chart
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-demo
+    targetRevision: 0.31.0
+
+    helm:
+      valuesObject:
+        # Use our custom values
+        # These override the chart's default values
+
+        # Disable internal observability components (we use external ones)
+        jaeger:
+          enabled: false
+
+        prometheus:
+          enabled: false
+
+        grafana:
+          enabled: false
+
+        # OpenTelemetry Collector configuration
+        opentelemetry-collector:
+          mode: deployment
+          config:
+            exporters:
+              otlp:
+                endpoint: "opentelemetry-collector.opentelemetry.svc.cluster.local:4317"
+                tls:
+                  insecure: true
+            service:
+              pipelines:
+                traces:
+                  exporters: [otlp]
+                metrics:
+                  exporters: [otlp]
+                logs:
+                  exporters: [otlp]
+
+        # Enable all microservices
+        default:
+          enabled: true
+          env:
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: "metadata.labels['app.kubernetes.io/component']"
+            - name: OTEL_COLLECTOR_NAME
+              value: 'opentelemetry-collector.opentelemetry'
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: 'http://opentelemetry-collector.opentelemetry:4317'
+
+        # Component-specific configurations
+        components:
+          frontend:
+            service:
+              type: ClusterIP
+
+          loadgenerator:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+
+        # Image configuration
+        image:
+          repository: ghcr.io/open-telemetry/demo
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: otel-demo
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

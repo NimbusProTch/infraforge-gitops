@@ -128,4 +128,4 @@ configs:
     # Repository settings
     repositories: |
       - type: git
-        url: https://github.com/gaskin/infraforge-gitops.git
+        url: https://github.com/NimbusProTch/infraforge-gitops.git

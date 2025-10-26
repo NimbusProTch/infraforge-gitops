@@ -9,7 +9,7 @@ InfraForge GitOps Platform'un repository yapısı ve kullanım kılavuzu.
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    INFRASTRUCTURE LAYER                      │
-│  github.com/gaskin/infraforge-gitops                        │
+│  github.com/NimbusProTch/infraforge-gitops                  │
 │  ├── terraform/         # Infrastructure as Code            │
 │  ├── argocd/           # GitOps configs                     │
 │  ├── apps/             # App deployment configs             │
@@ -19,17 +19,17 @@ InfraForge GitOps Platform'un repository yapısı ve kullanım kılavuzu.
 ┌─────────────────────────────────────────────────────────────┐
 │                    APPLICATION LAYER                         │
 │                                                              │
-│  github.com/gaskin/smk                                      │
+│  github.com/NimbusProTch/smk                                │
 │  ├── src/              # App code                           │
 │  ├── Dockerfile        # Container build                    │
 │  └── .github/          # CI/CD pipeline                     │
 │                                                              │
-│  github.com/gaskin/sonsuzenerji                             │
+│  github.com/NimbusProTch/sonsuzenerji                       │
 │  ├── src/              # App code                           │
 │  ├── Dockerfile        # Container build                    │
 │  └── .github/          # CI/CD pipeline                     │
 │                                                              │
-│  github.com/gaskin/transferhub                              │
+│  github.com/NimbusProTch/transferhub                        │
 │  └── ...                                                    │
 └─────────────────────────────────────────────────────────────┘
 ```

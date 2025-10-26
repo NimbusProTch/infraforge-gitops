@@ -46,7 +46,7 @@ Deploys enabled apps automatically
 
 ```bash
 # Clone repository
-git clone https://github.com/gaskin/infraforge-gitops.git
+git clone https://github.com/NimbusProTch/infraforge-gitops.git
 cd infraforge-gitops
 
 # Run setup script (creates S3 bucket, DynamoDB table, initializes OpenTofu)
@@ -268,7 +268,7 @@ MIT License - See LICENSE file for details
 ## 🆘 Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/gaskin/infraforge-gitops/issues
+- GitHub Issues: https://github.com/NimbusProTch/infraforge-gitops/issues
 - Documentation: Check `docs/` folder
 
 ## 🎯 Roadmap

@@ -57,7 +57,7 @@ env:
   AWS_REGION: eu-west-1
   APP_NAME: smk                          # ← App adınız (config/apps.yaml'dakiyle aynı)
   ECR_REPOSITORY: smk                    # ← ECR repository adınız
-  GITOPS_REPO: gaskin/infraforge-gitops # ← GitOps repo'nuz
+  GITOPS_REPO: NimbusProTch/infraforge-gitops # ← GitOps repo'nuz
   HELM_VALUES_PATH: helm/infraforge-app/values-smk.yaml # ← Values dosya yolu
 ```
 

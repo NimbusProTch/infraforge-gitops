@@ -19,14 +19,14 @@ infrastructure:
   # ============================================================================
   rds:
     mysql:
-      enabled: true  # External RDS MySQL
+      enabled: false  # External RDS MySQL - DISABLED (using internal CloudNativePG)
       engine_version: "8.0.35"
       instance_class: "db.t3.micro"
       allocated_storage: 20
       multi_az: false
       backup_retention_days: 7
     postgresql:
-      enabled: true  # External RDS PostgreSQL
+      enabled: false  # External RDS PostgreSQL - DISABLED (using internal CloudNativePG)
       engine_version: "15.4"
       instance_class: "db.t3.micro"
       allocated_storage: 20
@@ -109,11 +109,11 @@ infrastructure:
   # ============================================================================
   logging:
     loki:
-      enabled: true
+      enabled: false  # DISABLED - Missing Grafana Agent CRDs
       retention_days: 30
       storage_size: "100Gi"
     opentelemetry:
-      enabled: true  # OpenTelemetry Collector
+      enabled: false  # DISABLED - Missing cert-manager CRDs
       traces_enabled: true
       logs_enabled: true
       metrics_enabled: true
@@ -123,7 +123,7 @@ infrastructure:
   # ============================================================================
   backup:
     velero:
-      enabled: true
+      enabled: false  # DISABLED - Config format changed, needs update
       s3_bucket: "infraforge-velero-backups"
       backup_schedule: "0 2 * * *"  # Daily at 2 AM
       retention_days: 30
@@ -133,23 +133,23 @@ infrastructure:
   # ============================================================================
   internal_operators:
     cloudnative_pg:
-      enabled: false  # PostgreSQL Operator
+      enabled: true  # PostgreSQL Operator
       default_instances: 3
       storage_size: "10Gi"
     redis_operator:
-      enabled: false  # Redis Operator
+      enabled: false  # DISABLED - Chart version not found
       default_replicas: 3
       storage_size: "5Gi"
     rabbitmq_operator:
-      enabled: false  # RabbitMQ Cluster Operator
+      enabled: false  # DISABLED - Chart version not found
       default_replicas: 3
       storage_size: "10Gi"
     mongodb_operator:
-      enabled: false  # MongoDB Community Operator
+      enabled: false  # MongoDB Community Operator - disabled for now
       default_replicas: 3
       storage_size: "10Gi"
     strimzi_kafka:
-      enabled: false  # Kafka Operator (Strimzi)
+      enabled: true  # Kafka Operator (Strimzi)
       default_replicas: 3
       storage_size: "50Gi"
       zookeeper_replicas: 3
@@ -157,10 +157,12 @@ infrastructure:
 # Applications
 applications:
   smk:
-    enabled: true
+    enabled: false  # DISABLED - No image yet
     namespace: smk
     subdomain: smk                    # → smk.ticarethanem.net
     replicas: 2
+    ecr:
+      enabled: true                   # Create ECR repo for custom image
     image:
       repository_name: smk            # ECR repo name
       tag: latest
@@ -180,10 +182,12 @@ applications:
       targetCPUUtilizationPercentage: 75
 
   sonsuzenerji:
-    enabled: true
+    enabled: false  # DISABLED - No image yet
     namespace: sonsuzenerji
     subdomain: sonsuz               # → sonsuz.ticarethanem.net
     replicas: 2
+    ecr:
+      enabled: true                 # Create ECR repo for custom image
     image:
       repository_name: sonsuzenerji
       tag: latest
@@ -207,6 +211,8 @@ applications:
     namespace: transferhub
     subdomain: transfer              # → transfer.ticarethanem.net
     replicas: 2
+    ecr:
+      enabled: true                  # Create ECR repo for custom image
     image:
       repository_name: transferhub
       tag: latest
@@ -230,6 +236,8 @@ applications:
     namespace: dronesight
     subdomain: drone                 # → drone.ticarethanem.net
     replicas: 2
+    ecr:
+      enabled: true                  # Create ECR repo for custom image
     image:
       repository_name: dronesight
       tag: latest
@@ -246,4 +254,32 @@ applications:
       enabled: true
       minReplicas: 2
       maxReplicas: 10
+      targetCPUUtilizationPercentage: 75
+
+  # ============================================================================
+  # OpenTelemetry Demo - Microservices Demo App
+  # ============================================================================
+  otel-demo:
+    enabled: true
+    namespace: otel-demo
+    subdomain: otel                  # → otel.ticarethanem.net
+    replicas: 1
+    ecr:
+      enabled: false                 # Uses official image (no custom ECR needed)
+    image:
+      repository_name: otel-demo     # Using official OpenTelemetry demo
+      tag: latest
+    resources:
+      cpu: "100m"
+      memory: "128Mi"
+    ingress:
+      enabled: true
+      path: /
+    database:
+      type: none  # Demo uses internal services
+      name: ""
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
       targetCPUUtilizationPercentage: 75

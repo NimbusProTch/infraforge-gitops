@@ -1,0 +1,140 @@
+# OpenTelemetry Demo Application
+# Official microservices demo from OpenTelemetry project
+# https://github.com/open-telemetry/opentelemetry-demo
+
+# Using the official OpenTelemetry Demo Helm chart
+# Chart repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+
+# Disable internal components (we use external ones)
+jaeger:
+  enabled: false  # Using external Jaeger in opentelemetry namespace
+
+prometheus:
+  enabled: false  # Using kube-prometheus-stack
+
+grafana:
+  enabled: false  # Using kube-prometheus-stack Grafana
+
+# OpenTelemetry Collector - send to external collector
+opentelemetry-collector:
+  enabled: true
+  mode: deployment
+  config:
+    exporters:
+      otlp:
+        endpoint: "opentelemetry-collector.opentelemetry.svc.cluster.local:4317"
+        tls:
+          insecure: true
+    service:
+      pipelines:
+        traces:
+          exporters: [otlp]
+        metrics:
+          exporters: [otlp]
+        logs:
+          exporters: [otlp]
+
+# Demo components
+components:
+  frontend:
+    enabled: true
+    service:
+      type: ClusterIP
+
+  adService:
+    enabled: true
+
+  cartService:
+    enabled: true
+
+  checkoutService:
+    enabled: true
+
+  currencyService:
+    enabled: true
+
+  emailService:
+    enabled: true
+
+  paymentService:
+    enabled: true
+
+  productCatalogService:
+    enabled: true
+
+  recommendationService:
+    enabled: true
+
+  shippingService:
+    enabled: true
+
+  featureflagService:
+    enabled: true
+
+  loadGenerator:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+
+# Redis for cart service
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      storageClass: "gp3"
+      size: 1Gi
+
+# Kafka for event streaming
+kafka:
+  enabled: true
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 5Gi
+  zookeeper:
+    persistence:
+      enabled: true
+      storageClass: "gp3"
+      size: 2Gi
+
+# PostgreSQL for some services
+postgresql:
+  enabled: true
+  auth:
+    database: otel_demo
+    username: otel
+    password: otel123
+  primary:
+    persistence:
+      enabled: true
+      storageClass: "gp3"
+      size: 5Gi
+
+# Service mesh integration
+serviceMonitor:
+  enabled: true  # Create ServiceMonitor for Prometheus
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    external-dns.alpha.kubernetes.io/hostname: otel.ticarethanem.net
+  hosts:
+    - host: otel.ticarethanem.net
+      paths:
+        - path: /
+          pathType: Prefix
+          port: 8080

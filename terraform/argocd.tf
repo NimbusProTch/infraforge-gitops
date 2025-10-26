@@ -100,25 +100,26 @@ data "kubernetes_secret" "argocd_initial_admin_secret" {
 }
 
 # ============================================================================
-# ArgoCD GitHub Repository Secret (Optional - for private repos)
+# ArgoCD GitHub Repository Secret (for private repos)
 # ============================================================================
 
-# Uncomment if using private GitHub repositories
-# resource "kubernetes_secret" "argocd_repo" {
-#   metadata {
-#     name      = "github-repo"
-#     namespace = kubernetes_namespace.argocd.metadata[0].name
-#     labels = {
-#       "argocd.argoproj.io/secret-type" = "repository"
-#     }
-#   }
+resource "kubernetes_secret" "argocd_repo" {
+  count = var.github_token != "" ? 1 : 0
 
-#   data = {
-#     type          = "git"
-#     url           = var.git_repo_url
-#     password      = var.github_token
-#     username      = "git"
-#   }
+  metadata {
+    name      = "github-repo"
+    namespace = kubernetes_namespace.argocd.metadata[0].name
+    labels = {
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+  }
 
-#   depends_on = [helm_release.argocd]
-# }
+  data = {
+    type     = "git"
+    url      = var.git_repo_url
+    password = var.github_token
+    username = "git"
+  }
+
+  depends_on = [helm_release.argocd]
+}

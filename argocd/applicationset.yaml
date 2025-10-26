@@ -14,29 +14,27 @@ spec:
         elements:
           # This will be populated by Terraform based on enabled apps in config/apps.yaml
           # Terraform will read config and only include enabled apps
-          {{- range $key, $value := .applications }}
-          {{- if $value.enabled }}
-          - name: {{ $key }}
-            namespace: {{ $value.namespace }}
-            subdomain: {{ $value.subdomain }}
-            replicas: {{ $value.replicas }}
+%{ for key, value in applications ~}
+          - name: ${key}
+            namespace: ${value.namespace}
+            subdomain: ${value.subdomain}
+            replicas: ${value.replicas}
             image:
-              repository_name: {{ $value.image.repository_name }}
-              tag: {{ $value.image.tag }}
+              repository_name: ${value.image.repository_name}
+              tag: ${value.image.tag}
             resources:
-              cpu: {{ $value.resources.cpu }}
-              memory: {{ $value.resources.memory }}
+              cpu: ${value.resources.cpu}
+              memory: ${value.resources.memory}
             ingress:
-              enabled: {{ $value.ingress.enabled }}
+              enabled: ${value.ingress.enabled}
             database:
-              type: {{ $value.database.type }}
+              type: ${value.database.type}
             autoscaling:
-              enabled: {{ $value.autoscaling.enabled }}
-              minReplicas: {{ $value.autoscaling.minReplicas }}
-              maxReplicas: {{ $value.autoscaling.maxReplicas }}
-              targetCPUUtilizationPercentage: {{ $value.autoscaling.targetCPUUtilizationPercentage }}
-          {{- end }}
-          {{- end }}
+              enabled: ${value.autoscaling.enabled}
+              minReplicas: ${value.autoscaling.minReplicas}
+              maxReplicas: ${value.autoscaling.maxReplicas}
+              targetCPUUtilizationPercentage: ${value.autoscaling.targetCPUUtilizationPercentage}
+%{ endfor ~}
 
   template:
     metadata:

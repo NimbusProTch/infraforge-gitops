@@ -53,11 +53,12 @@ locals {
   # Container Registry
   # ============================================================================
   ecr_enabled = try(local.apps_config.infrastructure.ecr.enabled, true)
-  ecr_apps = local.ecr_enabled ? (
-    try(local.apps_config.infrastructure.ecr.create_for_disabled_apps, true) ?
-    local.all_apps :         # Create for all apps
-    keys(local.enabled_apps) # Create only for enabled apps
-  ) : []
+
+  # ECR apps - only create for apps with ecr.enabled = true
+  ecr_apps = local.ecr_enabled ? [
+    for k, v in local.apps_config.applications : k
+    if try(v.ecr.enabled, true) # Default to true if ecr.enabled not specified
+  ] : []
 
   # ============================================================================
   # DNS & Certificates

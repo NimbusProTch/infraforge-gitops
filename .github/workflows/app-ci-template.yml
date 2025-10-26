@@ -36,7 +36,7 @@ env:
   AWS_REGION: eu-west-1
   APP_NAME: smk  # CHANGE THIS to your app name
   ECR_REPOSITORY: smk  # CHANGE THIS to your ECR repo name
-  GITOPS_REPO: gaskin/infraforge-gitops  # CHANGE THIS to your GitOps repo
+  GITOPS_REPO: NimbusProTch/infraforge-gitops  # CHANGE THIS to your GitOps repo
   HELM_VALUES_PATH: apps/smk/values.yaml  # CHANGE THIS to your app's values file path
 
 jobs:
