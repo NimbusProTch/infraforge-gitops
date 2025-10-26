@@ -277,3 +277,47 @@ resource "helm_release" "metrics_server" {
 
   depends_on = [module.eks]
 }
+
+# ============================================================================
+# cert-manager (Certificate Management)
+# ============================================================================
+
+# Namespace for cert-manager
+resource "kubernetes_namespace" "cert_manager" {
+  metadata {
+    name = "cert-manager"
+
+    labels = {
+      "app.kubernetes.io/name"       = "cert-manager"
+      "app.kubernetes.io/managed-by" = "opentofu"
+    }
+  }
+
+  depends_on = [module.eks]
+}
+
+# cert-manager Helm Release
+resource "helm_release" "cert_manager" {
+  name       = "cert-manager"
+  repository = "https://charts.jetstack.io"
+  chart      = "cert-manager"
+  namespace  = kubernetes_namespace.cert_manager.metadata[0].name
+  version    = "v1.13.3"
+
+  set {
+    name  = "installCRDs"
+    value = "true"
+  }
+
+  set {
+    name  = "global.leaderElection.namespace"
+    value = "cert-manager"
+  }
+
+  depends_on = [
+    module.eks,
+    kubernetes_namespace.cert_manager
+  ]
+
+  timeout = 600
+}

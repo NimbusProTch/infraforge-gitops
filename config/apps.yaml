@@ -113,7 +113,7 @@ infrastructure:
       retention_days: 30
       storage_size: "100Gi"
     opentelemetry:
-      enabled: false  # DISABLED - Missing cert-manager CRDs
+      enabled: true  # ENABLED - cert-manager installed
       traces_enabled: true
       logs_enabled: true
       metrics_enabled: true
@@ -259,8 +259,10 @@ applications:
   # ============================================================================
   # OpenTelemetry Demo - Microservices Demo App
   # ============================================================================
+  # Note: otel-demo uses its own official Helm chart (not generic infraforge-app)
+  # Managed via standalone ArgoCD Application: argocd/otel-demo-app.yaml
   otel-demo:
-    enabled: true
+    enabled: false  # Disabled from ApplicationSet - uses standalone Application
     namespace: otel-demo
     subdomain: otel                  # → otel.ticarethanem.net
     replicas: 1

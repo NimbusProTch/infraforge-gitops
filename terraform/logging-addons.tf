@@ -172,12 +172,13 @@ resource "helm_release" "opentelemetry_operator" {
 
   set {
     name  = "manager.collectorImage.repository"
-    value = "otel/opentelemetry-collector-k8s"
+    value = "otel/opentelemetry-collector-contrib"
   }
 
   depends_on = [
     module.eks,
-    kubernetes_namespace.opentelemetry
+    kubernetes_namespace.opentelemetry,
+    helm_release.cert_manager  # cert-manager must be installed first for CRDs
   ]
 }
 
