@@ -1,45 +1,34 @@
-# OpenTelemetry Demo Application
-# Official microservices demo from OpenTelemetry project
-# https://github.com/open-telemetry/opentelemetry-demo
+# OpenTelemetry Demo - Official Helm Chart Values
+# https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-demo
 
-# Using the official OpenTelemetry Demo Helm chart
-# Chart repo: https://open-telemetry.github.io/opentelemetry-helm-charts
-
-# Disable internal components (we use external ones)
-jaeger:
-  enabled: false  # Using external Jaeger in opentelemetry namespace
-
-prometheus:
-  enabled: false  # Using kube-prometheus-stack
-
-grafana:
-  enabled: false  # Using kube-prometheus-stack Grafana
-
-# OpenTelemetry Collector - send to external collector
-opentelemetry-collector:
-  enabled: true
-  mode: deployment
-  config:
-    exporters:
-      otlp:
-        endpoint: "opentelemetry-collector.opentelemetry.svc.cluster.local:4317"
-        tls:
-          insecure: true
-    service:
-      pipelines:
-        traces:
-          exporters: [otlp]
-        metrics:
-          exporters: [otlp]
-        logs:
-          exporters: [otlp]
-
-# Demo components
+# Demo components configuration
 components:
-  frontend:
+  # Frontend Proxy (Envoy) - Main entry point
+  frontendProxy:
     enabled: true
     service:
       type: ClusterIP
+      port: 8080
+    ingress:
+      enabled: true
+      ingressClassName: alb
+      annotations:
+        alb.ingress.kubernetes.io/scheme: internet-facing
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+        alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:eu-west-1:715841344657:certificate/451d7634-db6f-4e55-9a5f-43de4c2a6722
+        alb.ingress.kubernetes.io/ssl-redirect: '443'
+        external-dns.alpha.kubernetes.io/hostname: otel.ticarethanem.net
+      hosts:
+        - host: otel.ticarethanem.net
+          paths:
+            - path: /
+              pathType: Prefix
+              port: 8080
+
+  # All demo microservices
+  frontend:
+    enabled: true
 
   adService:
     enabled: true
@@ -68,73 +57,52 @@ components:
   shippingService:
     enabled: true
 
-  featureflagService:
+  accountingService:
     enabled: true
 
-  loadGenerator:
+  frauddetectionService:
+    enabled: true
+
+  quoteService:
+    enabled: true
+
+  imageprovider:
+    enabled: true
+
+  # Kafka for event streaming
+  kafka:
     enabled: true
     resources:
-      requests:
-        cpu: 50m
-        memory: 128Mi
       limits:
-        cpu: 100m
-        memory: 256Mi
+        memory: 700Mi
 
-# Redis for cart service
-redis:
+# OpenTelemetry Collector (subchart)
+opentelemetry-collector:
   enabled: true
-  auth:
-    enabled: false
-  master:
-    persistence:
-      enabled: true
-      storageClass: "gp3"
-      size: 1Gi
+  mode: deployment
+  nameOverride: otelcol
 
-# Kafka for event streaming
-kafka:
+# Jaeger for trace visualization (subchart)
+jaeger:
   enabled: true
-  persistence:
+  provisionDataStore:
+    cassandra: false
+  allInOne:
     enabled: true
-    storageClass: "gp3"
-    size: 5Gi
-  zookeeper:
-    persistence:
-      enabled: true
-      storageClass: "gp3"
-      size: 2Gi
+    args:
+      - "--memory.max-traces"
+      - "10000"
+      - "--query.base-path=/jaeger/ui"
 
-# PostgreSQL for some services
-postgresql:
+# Prometheus (subchart)
+prometheus:
   enabled: true
-  auth:
-    database: otel_demo
-    username: otel
-    password: otel123
-  primary:
-    persistence:
-      enabled: true
-      storageClass: "gp3"
-      size: 5Gi
+  server:
+    retention: "2h"
+    persistentVolume:
+      enabled: false
 
-# Service mesh integration
-serviceMonitor:
-  enabled: true  # Create ServiceMonitor for Prometheus
-
-# Ingress configuration
-ingress:
+# Grafana (subchart)
+grafana:
   enabled: true
-  className: alb
-  annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
-    external-dns.alpha.kubernetes.io/hostname: otel.ticarethanem.net
-  hosts:
-    - host: otel.ticarethanem.net
-      paths:
-        - path: /
-          pathType: Prefix
-          port: 8080
+  adminPassword: "admin"
