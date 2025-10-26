@@ -123,3 +123,23 @@ resource "kubernetes_secret" "argocd_repo" {
 
   depends_on = [helm_release.argocd]
 }
+
+# ============================================================================
+# OpenTelemetry Demo - Standalone Application
+# ============================================================================
+# Note: otel-demo uses its own official Helm chart, not the generic infraforge-app
+# This standalone Application is managed by Terraform based on config/apps.yaml
+
+resource "kubectl_manifest" "otel_demo_app" {
+  count = try(local.apps_config.applications.otel-demo.enabled, false) ? 1 : 0
+
+  yaml_body = templatefile("${path.root}/../argocd/otel-demo-app.yaml", {
+    repo_url = var.git_repo_url
+    cert_arn = local.acm_enabled ? aws_acm_certificate.wildcard[0].arn : ""
+  })
+
+  depends_on = [
+    helm_release.argocd,
+    time_sleep.wait_for_argocd
+  ]
+}

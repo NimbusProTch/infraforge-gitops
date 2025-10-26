@@ -262,7 +262,7 @@ applications:
   # Note: otel-demo uses its own official Helm chart (not generic infraforge-app)
   # Managed via standalone ArgoCD Application: argocd/otel-demo-app.yaml
   otel-demo:
-    enabled: false  # Disabled from ApplicationSet - uses standalone Application
+    enabled: true  # ENABLED - Managed by Terraform via standalone Application
     namespace: otel-demo
     subdomain: otel                  # → otel.ticarethanem.net
     replicas: 1

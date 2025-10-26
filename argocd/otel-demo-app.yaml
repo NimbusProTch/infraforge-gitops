@@ -23,7 +23,7 @@ spec:
           - $values/apps/otel-demo/values.yaml
 
     # Source 2: GitOps repo for values file
-    - repoURL: https://github.com/NimbusProTch/infraforge-gitops.git
+    - repoURL: ${repo_url}
       targetRevision: main
       ref: values
 
