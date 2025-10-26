@@ -1,0 +1,192 @@
+# =============================================================================
+# GitHub Actions CI/CD Template for InfraForge Apps
+# =============================================================================
+#
+# This workflow template should be copied to each application repository.
+#
+# Prerequisites:
+# 1. Set GitHub Secrets in your app repository:
+#    - AWS_ACCESS_KEY_ID
+#    - AWS_SECRET_ACCESS_KEY
+#    - GITOPS_REPO_TOKEN (Personal Access Token with repo write permissions)
+#
+# 2. Update these variables for your app:
+#    - APP_NAME: Your application name (must match config/apps.yaml)
+#    - ECR_REPOSITORY: Your ECR repository name
+#    - GITOPS_REPO: Your GitOps repository (format: username/repo)
+#    - HELM_VALUES_PATH: Path to your app's values.yaml in GitOps repo
+#
+# =============================================================================
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  AWS_REGION: eu-west-1
+  APP_NAME: smk  # CHANGE THIS to your app name
+  ECR_REPOSITORY: smk  # CHANGE THIS to your ECR repo name
+  GITOPS_REPO: gaskin/infraforge-gitops  # CHANGE THIS to your GitOps repo
+  HELM_VALUES_PATH: apps/smk/values.yaml  # CHANGE THIS to your app's values file path
+
+jobs:
+  # ===========================================================================
+  # Build and Test
+  # ===========================================================================
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    outputs:
+      image-tag: ${{ steps.generate-tag.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate image tag
+        id: generate-tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            # If it's a tag, use the tag name
+            TAG=${GITHUB_REF#refs/tags/}
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            # For main branch, use commit SHA with 'main-' prefix
+            TAG="main-${GITHUB_SHA::8}"
+          elif [[ "${{ github.ref }}" == refs/heads/develop ]]; then
+            # For develop branch, use commit SHA with 'dev-' prefix
+            TAG="dev-${GITHUB_SHA::8}"
+          else
+            # For other branches/PRs, use branch name and commit SHA
+            BRANCH=$(echo ${GITHUB_REF#refs/heads/} | sed 's/[^a-zA-Z0-9]/-/g')
+            TAG="${BRANCH}-${GITHUB_SHA::8}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Generated image tag: ${TAG}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.generate-tag.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Add your test commands here
+      # - name: Run tests
+      #   run: |
+      #     docker run --rm ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.generate-tag.outputs.tag }} npm test
+
+  # ===========================================================================
+  # Push to ECR (only on main/develop/tags)
+  # ===========================================================================
+  push-to-ecr:
+    name: Push to ECR
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/'))
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image to ECR
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build-and-test.outputs.image-tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image info
+        run: |
+          echo "✅ Image pushed successfully!"
+          echo "Repository: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+          echo "Tag: ${{ needs.build-and-test.outputs.image-tag }}"
+
+  # ===========================================================================
+  # Update GitOps Repository
+  # ===========================================================================
+  update-gitops:
+    name: Update GitOps Repo
+    runs-on: ubuntu-latest
+    needs: [build-and-test, push-to-ecr]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITOPS_REPO_TOKEN }}
+          ref: main
+
+      - name: Install yq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+
+      - name: Update image tag in values file
+        run: |
+          # Update the image tag
+          yq eval '.image.tag = "${{ needs.build-and-test.outputs.image-tag }}"' -i ${{ env.HELM_VALUES_PATH }}
+
+          # Verify the update
+          echo "✅ Updated image tag in ${{ env.HELM_VALUES_PATH }}"
+          cat ${{ env.HELM_VALUES_PATH }}
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add ${{ env.HELM_VALUES_PATH }}
+          git commit -m "chore(${{ env.APP_NAME }}): update image tag to ${{ needs.build-and-test.outputs.image-tag }}"
+          git push
+
+      - name: Success notification
+        run: |
+          echo "✅ GitOps repository updated successfully!"
+          echo "ArgoCD will automatically sync the new image."

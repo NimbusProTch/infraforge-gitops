@@ -1,0 +1,36 @@
+# InfraForge Terraform Variables Example
+# Copy this file to terraform.tfvars and update with your values
+
+# AWS Configuration
+aws_region   = "eu-west-1"
+cluster_name = "infraforge-eks"
+
+# EKS Configuration
+cluster_version = "1.28"
+
+# VPC Configuration
+vpc_cidr             = "10.0.0.0/16"
+azs                  = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+private_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnet_cidrs  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# Node Configuration
+node_instance_types = ["t3.medium"]
+node_desired_size   = 2
+node_min_size       = 2
+node_max_size       = 6
+
+# Database Configuration
+db_username = "dbadmin"
+db_password = "CHANGE_ME_STRONG_PASSWORD"  # CHANGE THIS!
+
+# Git Repository
+git_repo_url = "https://github.com/gaskin/infraforge-gitops.git"
+
+# Tags
+default_tags = {
+  Project   = "infraforge"
+  ManagedBy = "terraform"
+  Owner     = "devops"
+  Team      = "platform"
+}

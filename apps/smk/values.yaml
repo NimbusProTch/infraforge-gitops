@@ -1,0 +1,121 @@
+# SMK Application - Helm Values
+# GitOps Configuration for Deployment
+#
+# This file is updated by CI/CD pipeline when new image is pushed
+# App Code Repo: github.com/gaskin/smk
+
+nameOverride: "smk"
+fullnameOverride: "smk"
+
+# Image Configuration (Updated by CI/CD)
+image:
+  repository: 715841344657.dkr.ecr.eu-west-1.amazonaws.com/smk
+  tag: "latest"  # ← CI/CD updates this
+  pullPolicy: Always
+
+# Replica Configuration
+replicaCount: 2
+
+# Resource Limits
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+
+# Service Configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    external-dns.alpha.kubernetes.io/hostname: smk.ticarethanem.net
+    # Certificate ARN is injected by ArgoCD from config/apps.yaml
+  hosts:
+    - host: smk.ticarethanem.net
+      paths:
+        - path: /
+          pathType: Prefix
+
+# Health Checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Environment Variables (from ConfigMap)
+envFrom:
+  - configMapRef:
+      name: smk-config
+  - secretRef:
+      name: smk-secrets
+
+# Additional Environment Variables
+env:
+  - name: NODE_ENV
+    value: "production"
+  - name: PORT
+    value: "3000"
+  - name: APP_NAME
+    value: "smk"
+
+# Pod Annotations (for monitoring)
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "3000"
+  prometheus.io/path: "/metrics"
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Node Selection (optional)
+nodeSelector: {}
+tolerations: []
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - smk
+          topologyKey: kubernetes.io/hostname

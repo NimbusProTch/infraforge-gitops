@@ -1,0 +1,101 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infraforge-apps
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+
+  generators:
+    # List generator - will be populated from config/apps.yaml by Terraform
+    # Only enabled apps will be in this list
+    - list:
+        elements:
+          # This will be populated by Terraform based on enabled apps in config/apps.yaml
+          # Terraform will read config and only include enabled apps
+          {{- range $key, $value := .applications }}
+          {{- if $value.enabled }}
+          - name: {{ $key }}
+            namespace: {{ $value.namespace }}
+            subdomain: {{ $value.subdomain }}
+            replicas: {{ $value.replicas }}
+            image:
+              repository_name: {{ $value.image.repository_name }}
+              tag: {{ $value.image.tag }}
+            resources:
+              cpu: {{ $value.resources.cpu }}
+              memory: {{ $value.resources.memory }}
+            ingress:
+              enabled: {{ $value.ingress.enabled }}
+            database:
+              type: {{ $value.database.type }}
+            autoscaling:
+              enabled: {{ $value.autoscaling.enabled }}
+              minReplicas: {{ $value.autoscaling.minReplicas }}
+              maxReplicas: {{ $value.autoscaling.maxReplicas }}
+              targetCPUUtilizationPercentage: {{ $value.autoscaling.targetCPUUtilizationPercentage }}
+          {{- end }}
+          {{- end }}
+
+  template:
+    metadata:
+      name: '{{ .name }}'
+      namespace: argocd
+      labels:
+        app: '{{ .name }}'
+        managed-by: applicationset
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+
+    spec:
+      project: default
+
+      sources:
+        # Source 1: Helm Chart (Base Template)
+        - repoURL: ${repo_url}
+          targetRevision: main
+          path: helm/infraforge-app
+          helm:
+            releaseName: '{{ .name }}'
+            # Use values from apps/{name}/values.yaml
+            valueFiles:
+              - ../../apps/{{ .name }}/values.yaml
+
+            # Override/inject values from config/apps.yaml (minimal)
+            values: |
+              # Image tag will be updated by CI/CD
+              image:
+                tag: {{ .image.tag }}
+
+              # Inject infrastructure values
+              ingress:
+                annotations:
+                  alb.ingress.kubernetes.io/certificate-arn: ${cert_arn}
+
+        # Source 2: App-specific manifests (secrets, configmaps)
+        - repoURL: ${repo_url}
+          targetRevision: main
+          path: apps/{{ .name }}
+          directory:
+            recurse: false
+
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .namespace }}'
+
+      syncPolicy:
+        automated:
+          prune: true       # Delete resources when app is disabled
+          selfHeal: true    # Auto-sync on drift
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=false  # Terraform already created it
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

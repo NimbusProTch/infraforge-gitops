@@ -1,0 +1,16 @@
+apiVersion: v2
+name: infraforge-app
+description: Generic Helm chart for InfraForge applications
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: InfraForge Team
+    email: devops@infraforge.io
+keywords:
+  - kubernetes
+  - microservices
+  - gitops
+home: https://github.com/gaskin/infraforge-gitops
+sources:
+  - https://github.com/gaskin/infraforge-gitops

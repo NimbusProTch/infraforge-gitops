@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "infraforge-app.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "infraforge-app.labels" . | nindent 4 }}
+data:
+  # Application-specific configuration
+  # This is a placeholder - actual config comes from Terraform

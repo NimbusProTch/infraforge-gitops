@@ -1,0 +1,61 @@
+# SMK Application - ConfigMap
+# Non-sensitive configuration values
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smk-config
+  namespace: smk
+  labels:
+    app.kubernetes.io/name: smk
+    app.kubernetes.io/managed-by: argocd
+data:
+  # Application Configuration
+  APP_NAME: "smk"
+  APP_VERSION: "1.0.0"
+  NODE_ENV: "production"
+
+  # Server Configuration
+  PORT: "3000"
+  HOST: "0.0.0.0"
+
+  # Database Configuration (connection details, not passwords)
+  DB_HOST: "infraforge-eks-mysql.xxxxxx.eu-west-1.rds.amazonaws.com"
+  DB_PORT: "3306"
+  DB_NAME: "smk_db"
+  DB_USERNAME: "dbadmin"
+  DB_POOL_MIN: "2"
+  DB_POOL_MAX: "10"
+
+  # Redis Configuration (if using ElastiCache or Redis Operator)
+  REDIS_HOST: "smk-redis-master.smk.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # Logging Configuration
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+
+  # API Configuration
+  API_BASE_URL: "https://smk.ticarethanem.net"
+  API_TIMEOUT: "30000"
+  API_RATE_LIMIT: "100"
+
+  # Feature Flags
+  FEATURE_NEW_UI: "true"
+  FEATURE_ANALYTICS: "true"
+  FEATURE_DEBUG_MODE: "false"
+
+  # External Services
+  AWS_REGION: "eu-west-1"
+  S3_BUCKET: "smk-uploads"
+
+  # Monitoring
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "3000"
+  METRICS_PATH: "/metrics"
+
+  # CORS Configuration
+  CORS_ORIGINS: "https://ticarethanem.net,https://www.ticarethanem.net"
+  CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_CREDENTIALS: "true"
