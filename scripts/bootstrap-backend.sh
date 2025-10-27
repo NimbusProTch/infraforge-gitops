@@ -123,7 +123,7 @@ create_s3_bucket() {
         --region "$REGION" \
         --lifecycle-configuration '{
             "Rules": [{
-                "Id": "ExpireOldVersions",
+                "ID": "ExpireOldVersions",
                 "Status": "Enabled",
                 "NoncurrentVersionExpiration": {
                     "NoncurrentDays": 30
