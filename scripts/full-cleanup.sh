@@ -166,6 +166,45 @@ run_terraform_destroy() {
     fi
 }
 
+# Step 3.5: Wait for EKS cluster deletion
+wait_for_eks_deletion() {
+    if [ "$SKIP_AWS" = true ]; then
+        log_warning "Skipping EKS deletion wait"
+        return 0
+    fi
+
+    log_info "Step 3.5: Waiting for EKS cluster deletion..."
+
+    # Check if any EKS clusters exist
+    local eks_clusters=$(aws eks list-clusters --region "$REGION" --query 'clusters' --output text 2>/dev/null | wc -w)
+
+    if [ "$eks_clusters" -eq 0 ]; then
+        log_success "No EKS clusters found, continuing..."
+        return 0
+    fi
+
+    log_info "Found $eks_clusters EKS cluster(s), waiting for deletion..."
+
+    local max_wait=600  # 10 minutes max
+    local waited=0
+    local interval=30
+
+    while [ $waited -lt $max_wait ]; do
+        eks_clusters=$(aws eks list-clusters --region "$REGION" --query 'clusters' --output text 2>/dev/null | wc -w)
+
+        if [ "$eks_clusters" -eq 0 ]; then
+            log_success "EKS cluster(s) deleted successfully"
+            return 0
+        fi
+
+        log_info "Still waiting... ($waited/$max_wait seconds elapsed)"
+        sleep $interval
+        waited=$((waited + interval))
+    done
+
+    log_warning "EKS cluster deletion timeout reached, continuing anyway..."
+}
+
 # Step 4: Manual AWS resource cleanup
 cleanup_aws_resources() {
     if [ "$SKIP_AWS" = true ]; then
@@ -317,6 +356,9 @@ main() {
 
     echo ""
     run_terraform_destroy
+
+    echo ""
+    wait_for_eks_deletion
 
     echo ""
     cleanup_aws_resources

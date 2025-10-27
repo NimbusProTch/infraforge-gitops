@@ -58,13 +58,15 @@ Performs a complete cleanup of the entire InfraForge infrastructure. This script
 - `opentofu` (or `terraform`)
 
 **What it does:**
-- ✅ Cleans terminating namespaces
-- ✅ Deletes LoadBalancer services
-- ✅ Runs `tofu destroy`
-- ✅ Manually deletes LoadBalancers in AWS
-- ✅ Deletes Kubernetes-created Security Groups
-- ✅ Attempts VPC deletion
-- ✅ Verifies no cost-generating resources remain
+- ✅ **Step 1**: Cleans terminating namespaces (finalizer removal)
+- ✅ **Step 2**: Deletes LoadBalancer services (prevents VPC lock)
+- ✅ **Step 3**: Runs `tofu destroy` (destroys infrastructure)
+- ✅ **Step 3.5**: **Waits for EKS cluster deletion** (max 10 mins)
+- ✅ **Step 4**: Manually deletes remaining AWS resources:
+  - LoadBalancers in AWS (if any left)
+  - Kubernetes-created Security Groups
+  - VPC (only after EKS is deleted)
+- ✅ **Step 5**: Verifies no cost-generating resources remain
 
 **Example:**
 ```bash
@@ -89,6 +91,12 @@ Are you sure you want to continue? (yes/no): yes
 [INFO] Step 3: Running Terraform/OpenTofu destroy...
 [INFO] Starting infrastructure destroy (this may take 10-20 minutes)...
 [SUCCESS] Terraform destroy completed successfully
+
+[INFO] Step 3.5: Waiting for EKS cluster deletion...
+[INFO] Found 1 EKS cluster(s), waiting for deletion...
+[INFO] Still waiting... (0/600 seconds elapsed)
+[INFO] Still waiting... (30/600 seconds elapsed)
+[SUCCESS] EKS cluster(s) deleted successfully
 
 [INFO] Step 4: Manual AWS resource cleanup...
 [INFO] Found VPC: vpc-019ca85c583e108ab
@@ -131,18 +139,30 @@ kubectl get namespace <namespace> -o json | \
 
 **Problem:** VPC deletion fails with "DependencyViolation" error.
 
-**Cause:** Usually LoadBalancers or Security Groups created by Kubernetes services.
+**Cause:**
+- EKS cluster not fully deleted yet (ENIs still attached)
+- LoadBalancers or Security Groups created by Kubernetes services
+- Network interfaces still in use
 
 **Solution:**
-1. Delete LoadBalancer services first:
+
+**IMPORTANT:** EKS cluster must be fully deleted before VPC can be removed!
+
+1. **Wait for EKS deletion** (script does this automatically):
+   ```bash
+   aws eks list-clusters --region eu-west-1
+   # Should return empty
+   ```
+
+2. Delete LoadBalancer services first:
    ```bash
    kubectl get svc --all-namespaces | grep LoadBalancer
    kubectl delete svc <service-name> -n <namespace>
    ```
 
-2. Wait 2-3 minutes for AWS to clean up
+3. Wait 2-3 minutes for AWS to clean up ENIs
 
-3. Delete remaining Security Groups:
+4. Delete remaining Security Groups:
    ```bash
    aws ec2 describe-security-groups --filters "Name=vpc-id,Values=<vpc-id>" \
      --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text | \
