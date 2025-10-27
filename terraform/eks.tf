@@ -57,8 +57,8 @@ module "eks" {
       }
 
       # IAM role configuration
-      iam_role_name                = "${var.cluster_name}-ng-role"
-      iam_role_use_name_prefix     = false
+      iam_role_name            = "${var.cluster_name}-ng-role"
+      iam_role_use_name_prefix = false
       iam_role_additional_policies = {
         AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
       }

@@ -1,0 +1,92 @@
+# ============================================================================
+# Atlantis Configuration
+# ============================================================================
+# Atlantis provides Terraform automation via Pull Requests
+# https://www.runatlantis.io/
+# ============================================================================
+
+version: 3
+
+# Auto-plan when files change
+automerge: false
+delete_source_branch_on_merge: true
+
+# Projects configuration
+projects:
+  - name: infraforge-production
+    dir: terraform
+    workspace: default
+    terraform_version: v1.9.0
+
+    # Auto-plan when these files change
+    autoplan:
+      when_modified:
+        - "*.tf"
+        - "*.tfvars"
+        - "../config/apps.yaml"
+        - "../argocd/*.yaml"
+      enabled: true
+
+    # Apply requirements
+    apply_requirements:
+      - approved
+      - mergeable
+
+    # Workflow
+    workflow: infraforge
+
+# Custom workflows
+workflows:
+  infraforge:
+    plan:
+      steps:
+        - init:
+            extra_args:
+              - "-upgrade"
+        - run: echo "📊 Planning infrastructure changes..."
+        - plan:
+            extra_args:
+              - "-var-file=terraform.tfvars"
+
+    apply:
+      steps:
+        - run: echo "🚀 Applying infrastructure changes..."
+        - apply
+
+# Allowed overrides for atlantis commands
+allowed_overrides:
+  - apply_requirements
+  - workflow
+  - delete_source_branch_on_merge
+
+# Repo-level configuration
+repos:
+  - id: github.com/NimbusProTch/infraforge-gitops
+
+    # Branch protection
+    branch: main
+
+    # PR requirements before apply
+    apply_requirements:
+      - approved
+      - mergeable
+
+    # Allowed workflows
+    allowed_workflows:
+      - infraforge
+
+    # Custom commands
+    pre_workflow_hooks:
+      - run: |
+          # Validate config before plan
+          if [ -f "../config/apps.yaml" ]; then
+            echo "✓ Config file exists"
+          else
+            echo "✗ Config file missing!"
+            exit 1
+          fi
+
+    post_workflow_hooks:
+      - run: |
+          # Notify on successful apply
+          echo "✅ Infrastructure changes applied successfully!"

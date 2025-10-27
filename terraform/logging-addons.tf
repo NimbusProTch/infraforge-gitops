@@ -178,7 +178,7 @@ resource "helm_release" "opentelemetry_operator" {
   depends_on = [
     module.eks,
     kubernetes_namespace.opentelemetry,
-    helm_release.cert_manager  # cert-manager must be installed first for CRDs
+    helm_release.cert_manager # cert-manager must be installed first for CRDs
   ]
 }
 
