@@ -1,0 +1,100 @@
+# ArgoCD Application Manifest
+# Copy this file and customize for your application
+#
+# Usage:
+#   1. Copy to applications/argocd-apps/my-app.yaml
+#   2. Replace 'app-name' with your app name
+#   3. Choose environment (dev/prod)
+#   4. Apply: kubectl apply -f applications/argocd-apps/my-app.yaml
+#
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-name-prod
+  namespace: argocd
+  annotations:
+    # ArgoCD Image Updater Configuration
+    # ====================================
+    # Automatically updates image tags when new versions are pushed
+
+    # Image to track (multiple images supported)
+    argocd-image-updater.argoproj.io/image-list: app-name=ghcr.io/nimbusproch/app-name
+
+    # Update strategy: semver (semantic versioning)
+    # Other options: latest, digest, name
+    argocd-image-updater.argoproj.io/app-name.update-strategy: semver
+
+    # Only allow semantic version tags (v1.2.3)
+    argocd-image-updater.argoproj.io/app-name.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+
+    # Kustomize image name to update
+    argocd-image-updater.argoproj.io/app-name.kustomize.image-name: ghcr.io/nimbusproch/app-name
+
+    # Force update even if tag exists
+    argocd-image-updater.argoproj.io/app-name.force-update: "true"
+
+    # Write back method: git (pushes to repo) or argocd (updates in cluster only)
+    argocd-image-updater.argoproj.io/write-back-method: git
+
+    # Git branch to commit changes
+    argocd-image-updater.argoproj.io/write-back-target: "kustomization:../../base"
+
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  project: default
+
+  # Source repository
+  source:
+    repoURL: https://github.com/NimbusProTch/infraforge-gitops.git
+    targetRevision: main
+    path: applications/app-name/overlays/prod  # Change to 'dev' for development
+
+    # Kustomize build options
+    kustomize:
+      version: v5.0.0
+      # commonLabels:
+      #   app.kubernetes.io/instance: app-name-prod
+
+  # Destination cluster
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production  # Change to 'dev' for development
+
+  # Sync policy
+  syncPolicy:
+    automated:
+      prune: true        # Remove resources that are no longer defined
+      selfHeal: true     # Force sync if cluster state deviates
+      allowEmpty: false  # Don't sync if no resources
+
+    syncOptions:
+      - CreateNamespace=true  # Auto-create namespace if not exists
+      - PruneLast=true        # Prune resources as last step
+      - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
+
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health assessment
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore HPA-managed replicas
+    - group: "*"
+      kind: "*"
+      managedFieldsManagers:
+        - kube-controller-manager  # Ignore controller updates
+
+  # Notification annotations (optional)
+  # notifications:
+  #   - trigger: on-deployed
+  #     destinations:
+  #       - slack:my-channel

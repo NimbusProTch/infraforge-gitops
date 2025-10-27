@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: example-api-prod
+  namespace: argocd
+  annotations:
+    # ArgoCD Image Updater
+    argocd-image-updater.argoproj.io/image-list: example-api=ghcr.io/nimbusproch/example-api
+    argocd-image-updater.argoproj.io/example-api.update-strategy: semver
+    argocd-image-updater.argoproj.io/example-api.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/example-api.kustomize.image-name: ghcr.io/nimbusproch/example-api
+    argocd-image-updater.argoproj.io/write-back-method: git
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/NimbusProTch/infraforge-gitops.git
+    targetRevision: main
+    path: applications/example-api/overlays/prod
+    kustomize:
+      version: v5.0.0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

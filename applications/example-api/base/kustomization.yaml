@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: example-api
+  app.kubernetes.io/managed-by: argocd
+
+# Common annotations
+commonAnnotations:
+  managed-by: infraforge-gitops
+
+# Resources
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# Image transformations
+# CI/CD will update this section with: kustomize edit set image
+images:
+  - name: ghcr.io/nimbusproch/example-api
+    newTag: v1.0.0  # ← CI/CD updates this automatically
+
+# ConfigMap generator (optional)
+# configMapGenerator:
+# - name: app-config
+#   literals:
+#   - LOG_LEVEL=info
+#   - MAX_CONNECTIONS=100
+
+# Secret generator (use External Secrets instead in production)
+# secretGenerator:
+# - name: app-secrets
+#   envs:
+#   - .env.secrets

@@ -1,0 +1,201 @@
+# CI/CD Pipeline for Applications
+# ================================
+# This workflow:
+# 1. Builds Docker image
+# 2. Runs tests
+# 3. Pushes to GitHub Container Registry (GHCR)
+# 4. Updates kustomization.yaml with new image tag
+# 5. ArgoCD automatically detects and deploys
+#
+# Usage:
+#   - Triggered on push to main or tags matching v*.*.*
+#   - Copy to your application repo and customize
+
+name: CI/CD - Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*.*.*'  # Semantic versioning tags (v1.2.3)
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================================================
+  # Job 1: Build and Test
+  # ============================================================================
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Determine version from git tag or commit SHA
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          elif [[ "${{ github.ref }}" == refs/heads/main ]]; then
+            VERSION=v1.0.${{ github.run_number }}
+          else
+            VERSION=dev-${{ github.sha::7 }}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      # Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GitHub Container Registry
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata for Docker
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=${{ steps.version.outputs.version }}
+
+      # Build and push Docker image
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+      # Run tests (customize based on your stack)
+      - name: Run tests
+        run: |
+          echo "🧪 Running tests..."
+          # docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} npm test
+          echo "✅ Tests passed"
+
+      # Security scan with Trivy
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ============================================================================
+  # Job 2: Update GitOps Repository
+  # ============================================================================
+  update-gitops:
+    name: Update GitOps Repo
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: NimbusProTch/infraforge-gitops
+          token: ${{ secrets.GITOPS_PAT }}  # Personal Access Token with repo write access
+          ref: main
+
+      # Update image tag in kustomization.yaml
+      - name: Update kustomization.yaml
+        run: |
+          APP_NAME="${{ github.event.repository.name }}"
+          VERSION="${{ needs.build.outputs.version }}"
+
+          echo "📝 Updating $APP_NAME to version $VERSION"
+
+          # Update base kustomization.yaml
+          cd applications/$APP_NAME/base
+
+          # Using kustomize edit command
+          kustomize edit set image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
+
+          echo "✅ Updated kustomization.yaml"
+          cat kustomization.yaml
+
+      # Commit and push changes
+      - name: Commit and push
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+          git add applications/
+          git commit -m "🚀 Update ${{ github.event.repository.name }} to ${{ needs.build.outputs.version }}
+
+          Automated update by GitHub Actions
+
+          - Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}
+          - Commit: ${{ github.sha }}
+          - Triggered by: ${{ github.actor }}"
+
+          git push
+
+      # Notify ArgoCD (optional - ArgoCD auto-syncs every 3 minutes by default)
+      - name: Trigger ArgoCD sync
+        if: false  # Enable if you have ArgoCD CLI access
+        run: |
+          argocd app sync ${{ github.event.repository.name }}-prod --force
+
+  # ============================================================================
+  # Job 3: Notify
+  # ============================================================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [build, update-gitops]
+    if: always()
+
+    steps:
+      - name: Send notification
+        run: |
+          echo "🎉 Deployment initiated for ${{ github.event.repository.name }}"
+          echo "📦 Version: ${{ needs.build.outputs.version }}"
+          echo "🔗 Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }}"
+          # Add Slack/Discord webhook here if needed

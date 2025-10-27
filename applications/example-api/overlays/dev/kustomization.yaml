@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reference base
+bases:
+  - ../../base
+
+# Namespace
+namespace: dev
+
+# Common labels for dev environment
+commonLabels:
+  environment: dev
+
+# Patches for development
+patches:
+  # Reduce resources for dev
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: example-api
+      spec:
+        replicas: 1
+        template:
+          spec:
+            containers:
+            - name: example-api
+              env:
+              - name: ENVIRONMENT
+                value: "development"
+              - name: LOG_LEVEL
+                value: "debug"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+
+# ConfigMap overlays for dev
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - CORS_ENABLED=true

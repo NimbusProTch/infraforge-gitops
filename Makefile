@@ -86,6 +86,12 @@ help:
 	@echo "  make argocd-ui      - Open ArgoCD UI (port-forward)"
 	@echo "  make grafana-ui     - Open Grafana UI (port-forward)"
 	@echo ""
+	@echo "Application Commands:"
+	@echo "  make create-app     - Create new application from template"
+	@echo "  make list-apps      - List all applications"
+	@echo "  make deploy-app     - Deploy application to ArgoCD"
+	@echo "  make app-status     - Show application status in ArgoCD"
+	@echo ""
 	@echo "Cleanup Commands:"
 	@echo "  make cleanup-ns     - Clean up stuck Kubernetes namespaces"
 	@echo "  make full-cleanup   - Full infrastructure cleanup (interactive)"
@@ -367,3 +373,60 @@ ci-plan: validate
 ci-apply:
 	$(call print_header,CI Apply)
 	@cd $(TERRAFORM_DIR) && tofu apply -auto-approve -no-color
+
+# ============================================================================
+# Application Management
+# ============================================================================
+
+## create-app: Create new application from template
+create-app:
+	$(call print_header,Create New Application)
+	@$(SCRIPTS_DIR)/create-app.sh
+
+## list-apps: List all applications
+list-apps:
+	$(call print_header,Applications)
+	@echo ""
+	@echo "Local Applications:"
+	@find applications -maxdepth 1 -mindepth 1 -type d ! -name '_template' ! -name 'argocd-apps' -exec basename {} \;
+	@echo ""
+	@echo "ArgoCD Applications:"
+	@kubectl get applications -n argocd 2>/dev/null || echo "ArgoCD not accessible (run 'make kubeconfig' first)"
+
+## deploy-app: Deploy application to ArgoCD
+deploy-app:
+	$(call print_header,Deploy Application)
+	@read -p "Enter application name: " app_name && \
+	read -p "Enter environment (dev/prod): " env && \
+	if [ -f "applications/argocd-apps/$$app_name-$$env.yaml" ]; then \
+		kubectl apply -f applications/argocd-apps/$$app_name-$$env.yaml; \
+		$(call print_success,Application deployed: $$app_name-$$env); \
+	else \
+		$(call print_error,Application manifest not found: $$app_name-$$env); \
+		exit 1; \
+	fi
+
+## app-status: Show application status in ArgoCD
+app-status: kubeconfig
+	$(call print_header,Application Status)
+	@kubectl get applications -n argocd
+	@echo ""
+	@read -p "Enter application name for details (or press Enter to skip): " app_name && \
+	if [ -n "$$app_name" ]; then \
+		kubectl describe application $$app_name -n argocd; \
+	fi
+
+## app-logs: Show application logs
+app-logs: kubeconfig
+	$(call print_header,Application Logs)
+	@read -p "Enter application name: " app_name && \
+	read -p "Enter namespace (dev/production): " namespace && \
+	kubectl logs -n $$namespace -l app=$$app_name --tail=100 -f
+
+## app-restart: Restart application
+app-restart: kubeconfig
+	$(call print_header,Restart Application)
+	@read -p "Enter application name: " app_name && \
+	read -p "Enter namespace (dev/production): " namespace && \
+	kubectl rollout restart deployment $$app_name -n $$namespace && \
+	$(call print_success,Rollout initiated for $$app_name)
