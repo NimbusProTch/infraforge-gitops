@@ -12,7 +12,7 @@ module "vpc" {
 
   # Enable NAT Gateway for private subnets
   enable_nat_gateway   = true
-  single_nat_gateway   = false # One NAT per AZ for HA
+  single_nat_gateway   = true  # Single NAT for cost optimization ($35/mo vs $105/mo)
   enable_dns_hostnames = true
   enable_dns_support   = true
 

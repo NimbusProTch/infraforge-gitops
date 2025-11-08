@@ -1,0 +1,139 @@
+name: Simple API - CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/simple-api/**'
+      - '.github/workflows/simple-api-cicd.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REGISTRY: 715841344657.dkr.ecr.eu-west-1.amazonaws.com
+  ECR_REPOSITORY: simple-api
+  APP_PATH: apps/simple-api
+
+jobs:
+  build-and-deploy:
+    name: Build, Push to ECR & Update Manifests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push changes
+      id-token: write  # Required for AWS OIDC
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper git operations
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image tags
+        id: meta
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          IMAGE_TAG="${SHORT_SHA}"
+          LATEST_TAG="latest"
+
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "latest_tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.APP_PATH }}
+          file: ${{ env.APP_PATH }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.latest_tag }}
+          build-args: |
+            BUILD_ID=${{ steps.meta.outputs.short_sha }}
+            BUILD_DATE=${{ steps.meta.outputs.build_date }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Update values.yaml with new image tag
+        run: |
+          IMAGE_TAG="${{ steps.meta.outputs.image_tag }}"
+          VALUES_FILE="${{ env.APP_PATH }}/values.yaml"
+
+          # Update image tag in values.yaml
+          sed -i "s|tag:.*|tag: \"${IMAGE_TAG}\"|g" ${VALUES_FILE}
+
+          echo "✅ Updated ${VALUES_FILE} with tag: ${IMAGE_TAG}"
+          cat ${VALUES_FILE} | grep -A 2 "image:"
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          IMAGE_TAG="${{ steps.meta.outputs.image_tag }}"
+          VALUES_FILE="${{ env.APP_PATH }}/values.yaml"
+
+          # Check if there are changes
+          if git diff --quiet ${VALUES_FILE}; then
+            echo "ℹ️  No changes to commit"
+            exit 0
+          fi
+
+          # Commit and push
+          git add ${VALUES_FILE}
+          git commit -m "ci: Update simple-api image to ${IMAGE_TAG}
+
+          - Image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}
+          - Commit: ${{ github.sha }}
+          - Workflow: ${{ github.workflow }}
+          - Run: ${{ github.run_number }}
+
+          [skip ci]"
+
+          git push
+
+          echo "✅ Changes committed and pushed"
+
+      - name: Summary
+        run: |
+          echo "### 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application:** simple-api" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tag:** \`${{ steps.meta.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**ECR Image:** \`${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Date:** ${{ steps.meta.outputs.build_date }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit SHA:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ArgoCD will auto-sync within ~30 seconds" >> $GITHUB_STEP_SUMMARY
+          echo "- Check deployment: \`kubectl get pods -n simple-api\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Test endpoint: \`https://api.ticarethanem.net/\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ CI/CD Pipeline completed successfully!"
+            echo "   Image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.image_tag }}"
+            echo "   ArgoCD will deploy automatically."
+          else
+            echo "❌ CI/CD Pipeline failed!"
+            echo "   Check the logs for details."
+          fi

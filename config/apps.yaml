@@ -257,6 +257,34 @@ applications:
       targetCPUUtilizationPercentage: 75
 
   # ============================================================================
+  # Simple API - Demo Application for GitOps Testing
+  # ============================================================================
+  simple-api:
+    enabled: false  # DISABLED initially - will enable after infrastructure is ready
+    namespace: simple-api
+    subdomain: api                   # → api.ticarethanem.net
+    replicas: 1  # Start with 1 replica (cost optimized)
+    ecr:
+      enabled: true                  # Create ECR repo for custom image
+    image:
+      repository_name: simple-api
+      tag: latest
+    resources:
+      cpu: "100m"
+      memory: "128Mi"
+    ingress:
+      enabled: true
+      path: /
+    database:
+      type: none  # No database needed for simple API
+      name: ""
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+
+  # ============================================================================
   # OpenTelemetry Demo - Microservices Demo App
   # ============================================================================
   # Note: otel-demo uses its own official Helm chart (not generic infraforge-app)

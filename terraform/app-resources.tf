@@ -26,8 +26,10 @@ resource "kubernetes_namespace" "apps" {
 }
 
 # ============================================================================
-# Database Secrets for Apps with MySQL
+# Database Secrets for Apps with MySQL (External RDS)
 # ============================================================================
+# Note: Only created if RDS MySQL is enabled
+# If using CloudNativePG or other internal databases, secrets are managed by ArgoCD
 
 resource "kubernetes_secret" "mysql_db_credentials" {
   for_each = local.need_mysql ? local.mysql_apps : {}
@@ -56,8 +58,10 @@ resource "kubernetes_secret" "mysql_db_credentials" {
 }
 
 # ============================================================================
-# Database Secrets for Apps with PostgreSQL
+# Database Secrets for Apps with PostgreSQL (External RDS)
 # ============================================================================
+# Note: Only created if RDS PostgreSQL is enabled
+# If using CloudNativePG, secrets are managed by the operator and ArgoCD
 
 resource "kubernetes_secret" "postgresql_db_credentials" {
   for_each = local.need_postgresql ? local.postgresql_apps : {}
